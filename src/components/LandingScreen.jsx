@@ -523,7 +523,7 @@ const LandingScreen = ({ onEnter }) => {
                 <p className="text-gray-400 text-sm mb-1">Visit my portfolio at</p>
                 <div className="text-white font-mono text-lg">
                   <DecryptedText
-                    text="yourwebsite.com"
+                    text="ibrahimaliabelporto.vercel.app"
                     speed={30}
                     maxIterations={15}
                     animateOn="hover"
