@@ -2,7 +2,6 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.jsx'
-import blzLogo from './assets/images/blz.svg' // Import logo
 
 // Function to update favicon
 const updateFavicon = (logoUrl) => {
@@ -23,7 +22,7 @@ const updateFavicon = (logoUrl) => {
 };
 
 // Update favicon when app loads
-updateFavicon(blzLogo);
+updateFavicon('/images/blz.svg');  // ✅ Menggunakan path langsung
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>

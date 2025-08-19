@@ -2,16 +2,25 @@
 import React, { useEffect, useRef, useCallback, useMemo, useState } from "react";
 import { Download, ExternalLink, Zap } from 'lucide-react';
 import { motion, useAnimation, useInView } from "framer-motion";
-import profileImage from '../assets/images/abel.jpg';
 
-// ProfileCard Component
+// ==================== CONSTANTS ====================
+/**
+ * Gradien default untuk efek background kartu
+ * Memberikan efek radial yang mengikuti posisi pointer
+ */
 const DEFAULT_BEHIND_GRADIENT =
   "radial-gradient(farthest-side circle at var(--pointer-x) var(--pointer-y),hsla(0,0%,90%,var(--card-opacity)) 4%,hsla(0,0%,80%,calc(var(--card-opacity)*0.75)) 10%,hsla(0,0%,70%,calc(var(--card-opacity)*0.5)) 50%,hsla(0,0%,60%,0) 100%),radial-gradient(35% 52% at 55% 20%,#ffffff44 0%,#00000000 100%),radial-gradient(100% 100% at 50% 50%,#ffffff66 1%,#00000000 76%),conic-gradient(from 124deg at 50% 50%,#ffffff77 0%,#cccccc77 40%,#cccccc77 60%,#ffffff77 100%)";
 
+/**
+ * Gradien default untuk bagian dalam kartu
+ */
 const DEFAULT_INNER_GRADIENT =
   "linear-gradient(145deg,#2a2a2a8c 0%,#40404044 100%)";
 
-const ANIMATION_CONFIG = {
+/**
+ * Konfigurasi durasi dan offset untuk animasi tilt card
+ */
+const TILT_ANIMATION_CONFIG = {
   SMOOTH_DURATION: 600,
   INITIAL_DURATION: 1500,
   INITIAL_X_OFFSET: 70,
@@ -19,8 +28,11 @@ const ANIMATION_CONFIG = {
   DEVICE_BETA_OFFSET: 20,
 };
 
-// Enhanced animation variants with more reliable triggers
-const fadeInUp = {
+// ==================== ANIMATION VARIANTS ====================
+/**
+ * Variasi animasi fade in dari bawah dengan blur effect
+ */
+const fadeInUpVariant = {
   hidden: { 
     opacity: 0, 
     y: 80,
@@ -40,7 +52,10 @@ const fadeInUp = {
   }
 };
 
-const fadeInLeft = {
+/**
+ * Variasi animasi fade in dari kiri
+ */
+const fadeInLeftVariant = {
   hidden: { 
     opacity: 0, 
     x: -80,
@@ -60,7 +75,10 @@ const fadeInLeft = {
   }
 };
 
-const fadeInRight = {
+/**
+ * Variasi animasi fade in dari kanan
+ */
+const fadeInRightVariant = {
   hidden: { 
     opacity: 0, 
     x: 80,
@@ -80,7 +98,10 @@ const fadeInRight = {
   }
 };
 
-const staggerContainer = {
+/**
+ * Container untuk mengelola stagger animation pada children
+ */
+const staggerContainerVariant = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
@@ -91,26 +112,40 @@ const staggerContainer = {
   }
 };
 
-const clamp = (value, min = 0, max = 100) =>
+// ==================== UTILITY FUNCTIONS ====================
+/**
+ * Membatasi nilai dalam rentang min dan max
+ */
+const clampValue = (value, min = 0, max = 100) =>
   Math.min(Math.max(value, min), max);
 
-const round = (value, precision = 3) =>
+/**
+ * Membulatkan angka dengan presisi tertentu
+ */
+const roundToDecimals = (value, precision = 3) =>
   parseFloat(value.toFixed(precision));
 
-const adjust = (
+/**
+ * Mengubah nilai dari satu rentang ke rentang lain
+ */
+const adjustValueRange = (
   value,
   fromMin,
   fromMax,
   toMin,
   toMax
 ) =>
-  round(toMin + ((toMax - toMin) * (value - fromMin)) / (fromMax - fromMin));
+  roundToDecimals(toMin + ((toMax - toMin) * (value - fromMin)) / (fromMax - fromMin));
 
+/**
+ * Fungsi easing untuk animasi yang lebih smooth
+ */
 const easeInOutCubic = (x) =>
   x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
 
+// ==================== PROFILE CARD COMPONENT ====================
 const ProfileCardComponent = ({
-  avatarUrl =  {profileImage},
+  avatarUrl = "/images/abel.jpg",
   behindGradient,
   innerGradient,
   showBehindGradient = true,
@@ -124,179 +159,209 @@ const ProfileCardComponent = ({
   showUserInfo = true,
   onContactClick,
 }) => {
-  const wrapRef = useRef(null);
+  const wrapperRef = useRef(null);
   const cardRef = useRef(null);
 
-  const animationHandlers = useMemo(() => {
+  /**
+   * Membuat handler animasi untuk tilt effect
+   * Mengembalikan fungsi-fungsi untuk mengupdate transform kartu
+   */
+  const tiltAnimationHandlers = useMemo(() => {
     if (!enableTilt) return null;
 
-    let rafId = null;
+    let requestId = null;
 
+    /**
+     * Update CSS transform properties berdasarkan posisi pointer
+     */
     const updateCardTransform = (
       offsetX,
       offsetY,
-      card,
-      wrap
+      cardElement,
+      wrapperElement
     ) => {
-      const width = card.clientWidth;
-      const height = card.clientHeight;
+      const width = cardElement.clientWidth;
+      const height = cardElement.clientHeight;
 
-      const percentX = clamp((100 / width) * offsetX);
-      const percentY = clamp((100 / height) * offsetY);
+      const percentX = clampValue((100 / width) * offsetX);
+      const percentY = clampValue((100 / height) * offsetY);
 
       const centerX = percentX - 50;
       const centerY = percentY - 50;
 
-      const properties = {
+      const cssProperties = {
         "--pointer-x": `${percentX}%`,
         "--pointer-y": `${percentY}%`,
-        "--background-x": `${adjust(percentX, 0, 100, 35, 65)}%`,
-        "--background-y": `${adjust(percentY, 0, 100, 35, 65)}%`,
-        "--pointer-from-center": `${clamp(Math.hypot(percentY - 50, percentX - 50) / 50, 0, 1)}`,
+        "--background-x": `${adjustValueRange(percentX, 0, 100, 35, 65)}%`,
+        "--background-y": `${adjustValueRange(percentY, 0, 100, 35, 65)}%`,
+        "--pointer-from-center": `${clampValue(Math.hypot(percentY - 50, percentX - 50) / 50, 0, 1)}`,
         "--pointer-from-top": `${percentY / 100}`,
         "--pointer-from-left": `${percentX / 100}`,
-        "--rotate-x": `${round(-(centerX / 5))}deg`,
-        "--rotate-y": `${round(centerY / 4)}deg`,
+        "--rotate-x": `${roundToDecimals(-(centerX / 5))}deg`,
+        "--rotate-y": `${roundToDecimals(centerY / 4)}deg`,
       };
 
-      Object.entries(properties).forEach(([property, value]) => {
-        wrap.style.setProperty(property, value);
+      Object.entries(cssProperties).forEach(([property, value]) => {
+        wrapperElement.style.setProperty(property, value);
       });
     };
 
+    /**
+     * Membuat animasi smooth dari posisi start ke center
+     */
     const createSmoothAnimation = (
       duration,
       startX,
       startY,
-      card,
-      wrap
+      cardElement,
+      wrapperElement
     ) => {
       const startTime = performance.now();
-      const targetX = wrap.clientWidth / 2;
-      const targetY = wrap.clientHeight / 2;
+      const targetX = wrapperElement.clientWidth / 2;
+      const targetY = wrapperElement.clientHeight / 2;
 
       const animationLoop = (currentTime) => {
         const elapsed = currentTime - startTime;
-        const progress = clamp(elapsed / duration);
+        const progress = clampValue(elapsed / duration);
         const easedProgress = easeInOutCubic(progress);
 
-        const currentX = adjust(easedProgress, 0, 1, startX, targetX);
-        const currentY = adjust(easedProgress, 0, 1, startY, targetY);
+        const currentX = adjustValueRange(easedProgress, 0, 1, startX, targetX);
+        const currentY = adjustValueRange(easedProgress, 0, 1, startY, targetY);
 
-        updateCardTransform(currentX, currentY, card, wrap);
+        updateCardTransform(currentX, currentY, cardElement, wrapperElement);
 
         if (progress < 1) {
-          rafId = requestAnimationFrame(animationLoop);
+          requestId = requestAnimationFrame(animationLoop);
         }
       };
 
-      rafId = requestAnimationFrame(animationLoop);
+      requestId = requestAnimationFrame(animationLoop);
     };
 
     return {
       updateCardTransform,
       createSmoothAnimation,
       cancelAnimation: () => {
-        if (rafId) {
-          cancelAnimationFrame(rafId);
-          rafId = null;
+        if (requestId) {
+          cancelAnimationFrame(requestId);
+          requestId = null;
         }
       },
     };
   }, [enableTilt]);
 
+  /**
+   * Handler untuk mouse/pointer movement
+   * Update posisi tilt berdasarkan pointer
+   */
   const handlePointerMove = useCallback(
     (event) => {
-      const card = cardRef.current;
-      const wrap = wrapRef.current;
+      const cardElement = cardRef.current;
+      const wrapperElement = wrapperRef.current;
 
-      if (!card || !wrap || !animationHandlers) return;
+      if (!cardElement || !wrapperElement || !tiltAnimationHandlers) return;
 
-      const rect = card.getBoundingClientRect();
-      animationHandlers.updateCardTransform(
+      const rect = cardElement.getBoundingClientRect();
+      tiltAnimationHandlers.updateCardTransform(
         event.clientX - rect.left,
         event.clientY - rect.top,
-        card,
-        wrap
+        cardElement,
+        wrapperElement
       );
     },
-    [animationHandlers]
+    [tiltAnimationHandlers]
   );
 
+  /**
+   * Handler ketika pointer masuk area kartu
+   * Aktifkan tilt mode dan hentikan animasi yang sedang berjalan
+   */
   const handlePointerEnter = useCallback(() => {
-    const card = cardRef.current;
-    const wrap = wrapRef.current;
+    const cardElement = cardRef.current;
+    const wrapperElement = wrapperRef.current;
 
-    if (!card || !wrap || !animationHandlers) return;
+    if (!cardElement || !wrapperElement || !tiltAnimationHandlers) return;
 
-    animationHandlers.cancelAnimation();
-    wrap.classList.add("active");
-    card.classList.add("active");
-  }, [animationHandlers]);
+    tiltAnimationHandlers.cancelAnimation();
+    wrapperElement.classList.add("active");
+    cardElement.classList.add("active");
+  }, [tiltAnimationHandlers]);
 
+  /**
+   * Handler ketika pointer keluar dari area kartu
+   * Kembalikan kartu ke posisi center dengan animasi smooth
+   */
   const handlePointerLeave = useCallback(
     (event) => {
-      const card = cardRef.current;
-      const wrap = wrapRef.current;
+      const cardElement = cardRef.current;
+      const wrapperElement = wrapperRef.current;
 
-      if (!card || !wrap || !animationHandlers) return;
+      if (!cardElement || !wrapperElement || !tiltAnimationHandlers) return;
 
-      animationHandlers.createSmoothAnimation(
-        ANIMATION_CONFIG.SMOOTH_DURATION,
+      tiltAnimationHandlers.createSmoothAnimation(
+        TILT_ANIMATION_CONFIG.SMOOTH_DURATION,
         event.offsetX,
         event.offsetY,
-        card,
-        wrap
+        cardElement,
+        wrapperElement
       );
-      wrap.classList.remove("active");
-      card.classList.remove("active");
+      wrapperElement.classList.remove("active");
+      cardElement.classList.remove("active");
     },
-    [animationHandlers]
+    [tiltAnimationHandlers]
   );
 
+  /**
+   * Setup event listeners untuk tilt effect dan animasi initial
+   */
   useEffect(() => {
-    if (!enableTilt || !animationHandlers) return;
+    if (!enableTilt || !tiltAnimationHandlers) return;
 
-    const card = cardRef.current;
-    const wrap = wrapRef.current;
+    const cardElement = cardRef.current;
+    const wrapperElement = wrapperRef.current;
 
-    if (!card || !wrap) return;
+    if (!cardElement || !wrapperElement) return;
 
     const pointerMoveHandler = handlePointerMove;
     const pointerEnterHandler = handlePointerEnter;
     const pointerLeaveHandler = handlePointerLeave;
 
-    card.addEventListener("pointerenter", pointerEnterHandler);
-    card.addEventListener("pointermove", pointerMoveHandler);
-    card.addEventListener("pointerleave", pointerLeaveHandler);
+    // Attach event listeners
+    cardElement.addEventListener("pointerenter", pointerEnterHandler);
+    cardElement.addEventListener("pointermove", pointerMoveHandler);
+    cardElement.addEventListener("pointerleave", pointerLeaveHandler);
 
-    const initialX = wrap.clientWidth - ANIMATION_CONFIG.INITIAL_X_OFFSET;
-    const initialY = ANIMATION_CONFIG.INITIAL_Y_OFFSET;
+    // Setup posisi awal dan jalankan animasi initial
+    const initialX = wrapperElement.clientWidth - TILT_ANIMATION_CONFIG.INITIAL_X_OFFSET;
+    const initialY = TILT_ANIMATION_CONFIG.INITIAL_Y_OFFSET;
 
-    animationHandlers.updateCardTransform(initialX, initialY, card, wrap);
-    animationHandlers.createSmoothAnimation(
-      ANIMATION_CONFIG.INITIAL_DURATION,
+    tiltAnimationHandlers.updateCardTransform(initialX, initialY, cardElement, wrapperElement);
+    tiltAnimationHandlers.createSmoothAnimation(
+      TILT_ANIMATION_CONFIG.INITIAL_DURATION,
       initialX,
       initialY,
-      card,
-      wrap
+      cardElement,
+      wrapperElement
     );
 
     return () => {
-      card.removeEventListener("pointerenter", pointerEnterHandler);
-      card.removeEventListener("pointermove", pointerMoveHandler);
-      card.removeEventListener("pointerleave", pointerLeaveHandler);
-      animationHandlers.cancelAnimation();
+      cardElement.removeEventListener("pointerenter", pointerEnterHandler);
+      cardElement.removeEventListener("pointermove", pointerMoveHandler);
+      cardElement.removeEventListener("pointerleave", pointerLeaveHandler);
+      tiltAnimationHandlers.cancelAnimation();
     };
   }, [
     enableTilt,
-    animationHandlers,
+    tiltAnimationHandlers,
     handlePointerMove,
     handlePointerEnter,
     handlePointerLeave,
   ]);
 
-  const cardStyle = useMemo(
+  /**
+   * CSS custom properties untuk styling dinamis
+   */
+  const cardCustomStyles = useMemo(
     () => ({
       "--behind-gradient": showBehindGradient
         ? (behindGradient ?? DEFAULT_BEHIND_GRADIENT)
@@ -307,18 +372,21 @@ const ProfileCardComponent = ({
     [showBehindGradient, behindGradient, innerGradient]
   );
 
-  const handleContactClick = useCallback(() => {
+  /**
+   * Handler untuk tombol contact
+   */
+  const handleContactButtonClick = useCallback(() => {
     onContactClick?.();
   }, [onContactClick]);
 
   return (
     <div
-      ref={wrapRef}
+      ref={wrapperRef}
       className={`relative perspective-[1000px] ${className}`.trim()}
       style={{
         width: '320px',
         height: '480px',
-        ...cardStyle
+        ...cardCustomStyles
       }}
     >
       <section 
@@ -329,7 +397,7 @@ const ProfileCardComponent = ({
           transformStyle: 'preserve-3d',
         }}
       >
-        {/* Background gradient layer */}
+        {/* Background gradient layer untuk efek behind */}
         <div 
           className="absolute inset-0 rounded-3xl opacity-90"
           style={{
@@ -339,11 +407,11 @@ const ProfileCardComponent = ({
           }}
         />
         
-        {/* Main card */}
+        {/* Main card container */}
         <div 
           className="relative w-full h-full rounded-3xl border border-gray-500/50 backdrop-blur-md overflow-hidden bg-gradient-to-b from-gray-900/90 to-black/95"
         >
-          {/* Shine effect */}
+          {/* Shine effect yang mengikuti posisi pointer */}
           <div 
             className="absolute inset-0 opacity-20 pointer-events-none"
             style={{
@@ -354,15 +422,15 @@ const ProfileCardComponent = ({
             }}
           />
           
-          {/* Content */}
+          {/* Content area */}
           <div className="relative z-10 p-8 h-full flex flex-col items-center">
-            {/* Header with name and title */}
+            {/* Header section dengan nama dan title */}
             <div className="text-center mb-8 mt-4">
               <h3 className="text-3xl font-light text-white mb-2">{name}</h3>
               <p className="text-lg text-gray-300">{title}</p>
             </div>
             
-            {/* Avatar - centered and larger */}
+            {/* Avatar utama - dipusatkan dan diperbesar */}
             <div className="flex-1 flex items-center justify-center mb-6">
               <img
                 className="w-48 h-48 object-cover rounded-full border-2 border-white/20"
@@ -375,7 +443,7 @@ const ProfileCardComponent = ({
               />
             </div>
             
-            {/* Bottom section with user info */}
+            {/* Bottom section dengan user info dan tombol contact */}
             {showUserInfo && (
               <div className="w-full">
                 <div className="bg-gray-900/60 backdrop-blur-sm rounded-2xl p-4 border border-gray-600/30">
@@ -396,7 +464,7 @@ const ProfileCardComponent = ({
                     
                     <button
                       className="bg-gray-700/70 hover:bg-gray-600/70 rounded-lg px-4 py-2 text-white text-sm font-medium transition-all duration-200"
-                      onClick={handleContactClick}
+                      onClick={handleContactButtonClick}
                       type="button"
                     >
                       {contactText}
@@ -414,53 +482,90 @@ const ProfileCardComponent = ({
 
 const ProfileCard = React.memo(ProfileCardComponent);
 
-// Custom hook for reliable scroll detection
-const useScrollAnimation = (threshold = 0.2) => {
-  const ref = useRef(null);
-  const controls = useAnimation();
-  const inView = useInView(ref, { 
+// ==================== CUSTOM HOOKS ====================
+/**
+ * Hook untuk scroll-triggered animation dengan kontrol yang lebih reliable
+ * Menggunakan Intersection Observer untuk deteksi element masuk viewport
+ */
+const useScrollTriggeredAnimation = (threshold = 0.2) => {
+  const elementRef = useRef(null);
+  const animationControls = useAnimation();
+  const isElementInView = useInView(elementRef, { 
     threshold: threshold,
     once: false,
     margin: "-100px 0px"
   });
 
   useEffect(() => {
-    if (inView) {
-      controls.start("visible");
+    if (isElementInView) {
+      animationControls.start("visible");
     } else {
-      controls.start("hidden");
+      animationControls.start("hidden");
     }
-  }, [controls, inView]);
+  }, [animationControls, isElementInView]);
 
-  return { ref, controls, inView };
+  return { 
+    ref: elementRef, 
+    controls: animationControls, 
+    inView: isElementInView 
+  };
 };
 
-// Main About Component
+// ==================== MAIN ABOUT COMPONENT ====================
+/**
+ * Komponen About utama yang menampilkan informasi pribadi
+ * dengan animasi scroll-triggered dan interactive profile card
+ */
 const About = () => {
-  // Use custom scroll animation hooks for each section
-  const headerAnimation = useScrollAnimation(0.1);
-  const contentAnimation = useScrollAnimation(0.2);
-  const cardAnimation = useScrollAnimation(0.2);
+  // Setup scroll animations untuk berbagai section
+  const headerScrollAnimation = useScrollTriggeredAnimation(0.1);
+  const contentScrollAnimation = useScrollTriggeredAnimation(0.2);
+  const cardScrollAnimation = useScrollTriggeredAnimation(0.2);
 
-  // Function to handle CV download
+  /**
+   * Handler untuk download CV
+   * Membuka Google Drive dalam tab baru
+   */
   const handleDownloadCV = () => {
     window.open('https://drive.google.com/drive/folders/1pUwnbGXDvZVzfdSbT8J9Dbx5a70qyBF8?usp=drive_link', '_blank');
+  };
+
+  /**
+   * Function untuk scroll ke section contact dengan smooth animation
+   * Menambahkan highlight effect setelah scroll selesai
+   */
+  const scrollToContactSection = () => {
+    const contactSection = document.getElementById('contact');
+    if (contactSection) {
+      contactSection.scrollIntoView({ 
+        behavior: 'smooth',
+        block: 'start'
+      });
+      
+      // Optional: Highlight section contact setelah scroll
+      setTimeout(() => {
+        contactSection.classList.add('highlight-section');
+        setTimeout(() => {
+          contactSection.classList.remove('highlight-section');
+        }, 2000);
+      }, 500);
+    }
   };
 
   return (
     <div id="about" className="min-h-screen bg-gradient-to-br from-black via-gray-900/30 to-black px-8 md:px-16 py-16 lg:py-24 pt-24">
       <div className="max-w-7xl mx-auto">
-        {/* Header Section with Enhanced AOS */}
+        {/* Header Section dengan animated title */}
         <motion.div 
-          ref={headerAnimation.ref}
+          ref={headerScrollAnimation.ref}
           className="text-center mb-16"
           initial="hidden"
-          animate={headerAnimation.controls}
-          variants={fadeInUp}
+          animate={headerScrollAnimation.controls}
+          variants={fadeInUpVariant}
         >
           <motion.h1 
             className="text-7xl lg:text-8xl font-bold mb-4"
-            variants={fadeInUp}
+            variants={fadeInUpVariant}
           >
             <span className="bg-gradient-to-r from-white via-gray-200 to-gray-300 bg-clip-text text-transparent">
               About Me
@@ -468,7 +573,7 @@ const About = () => {
           </motion.h1>
           <motion.div 
             className="flex items-center justify-center space-x-2 text-gray-300 text-lg"
-            variants={fadeInUp}
+            variants={fadeInUpVariant}
           >
             <span>✨</span>
             <span>Passionate about building intuitive and impactful mobile apps.</span>
@@ -477,18 +582,18 @@ const About = () => {
         </motion.div>
 
         <div className="grid lg:grid-cols-2 gap-16 items-center">
-          {/* Left Side - Content with Enhanced AOS */}
+          {/* Left Side - Content dengan description dan call-to-action */}
           <motion.div 
-            ref={contentAnimation.ref}
+            ref={contentScrollAnimation.ref}
             className="space-y-8"
             initial="hidden"
-            animate={contentAnimation.controls}
-            variants={staggerContainer}
+            animate={contentScrollAnimation.controls}
+            variants={staggerContainerVariant}
           >
-            <motion.div variants={fadeInLeft}>
+            <motion.div variants={fadeInLeftVariant}>
               <motion.h2 
                 className="text-4xl lg:text-5xl font-bold text-white mb-6"
-                variants={fadeInLeft}
+                variants={fadeInLeftVariant}
               >
                 Hello, I'm<br />
                 <span className="bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">
@@ -498,17 +603,17 @@ const About = () => {
               
               <motion.p 
                 className="text-gray-300 text-lg leading-relaxed mb-8"
-                variants={fadeInLeft}
+                variants={fadeInLeftVariant}
               >
                 An Informatics student with a strong interest in mobile application development. 
                 I focus on creating intuitive and functional digital solutions, and always strive 
                 to deliver the best user experience in every project I work on.
               </motion.p>
 
-              {/* Quote with Enhanced AOS */}
+              {/* Quote section dengan animasi icon */}
               <motion.div 
                 className="bg-gradient-to-r from-gray-900/40 to-black/40 border border-gray-600/40 rounded-2xl p-6 mb-8 backdrop-blur-sm w-fit"
-                variants={fadeInLeft}
+                variants={fadeInLeftVariant}
                 whileHover={{ 
                   scale: 1.02,
                   boxShadow: "0 20px 40px rgba(255, 255, 255, 0.1)"
@@ -516,25 +621,25 @@ const About = () => {
                 transition={{ type: "spring", stiffness: 300, damping: 20 }}
               >
                 <p className="text-gray-200 italic text-lg flex items-center whitespace-nowrap">
-                  <motion.div
+                  <motion.span 
                     animate={{ rotate: [0, 15, -15, 0] }}
                     transition={{ duration: 2, repeat: Infinity, repeatDelay: 3 }}
                   >
                     <Zap className="w-5 h-5 mr-2 flex-shrink-0" />
-                  </motion.div>
+                  </motion.span>
                   "AI as the brush, humans as the artist."
                 </p>
               </motion.div>
 
-              {/* Download CV Button - Single Button */}
+              {/* Download CV Button */}
               <motion.div 
                 className="flex justify-center sm:justify-start"
-                variants={fadeInLeft}
+                variants={fadeInLeftVariant}
               >
                 <motion.button 
                   onClick={handleDownloadCV}
                   className="flex items-center justify-center px-8 py-4 bg-white hover:bg-gray-200 rounded-full text-black font-semibold transition-all hover:scale-105 shadow-lg shadow-white/25"
-                  variants={fadeInLeft}
+                  variants={fadeInLeftVariant}
                   whileHover={{ 
                     scale: 1.05,
                     boxShadow: "0 20px 40px rgba(255, 255, 255, 0.3)"
@@ -553,17 +658,17 @@ const About = () => {
             </motion.div>
           </motion.div>
 
-          {/* Right Side - ProfileCard Component with Enhanced AOS */}
+          {/* Right Side - Interactive ProfileCard */}
           <motion.div 
-            ref={cardAnimation.ref}
+            ref={cardScrollAnimation.ref}
             className="flex justify-center lg:justify-end"
             initial="hidden"
-            animate={cardAnimation.controls}
-            variants={fadeInRight}
+            animate={cardScrollAnimation.controls}
+            variants={fadeInRightVariant}
           >
             <motion.div 
               className="w-80 h-96 lg:w-96 lg:h-[500px] relative flex items-center justify-center"
-              variants={fadeInRight}
+              variants={fadeInRightVariant}
               whileHover={{ scale: 1.02 }}
               transition={{ type: "spring", stiffness: 200, damping: 20 }}
             >
@@ -573,18 +678,18 @@ const About = () => {
                 handle="bellz"
                 status="Online"
                 contactText="Contact Me"
-                avatarUrl={profileImage}
+                avatarUrl="/images/abel.jpg"
                 showUserInfo={true}
                 enableTilt={true}
-                onContactClick={() => console.log('Contact clicked!')}
+                onContactClick={scrollToContactSection}
               />
             </motion.div>
           </motion.div>
         </div>
 
-        {/* Enhanced floating elements for visual enhancement */}
+        {/* Floating elements untuk visual enhancement */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          {/* Floating orbs with better animations */}
+          {/* Primary floating orbs dengan timing berbeda */}
           <motion.div
             className="absolute top-20 left-10 w-4 h-4 bg-white/20 rounded-full blur-sm"
             animate={{
@@ -630,7 +735,7 @@ const About = () => {
             }}
           />
           
-          {/* Additional floating particles for more dynamic effect */}
+          {/* Additional floating particles untuk efek lebih dinamis */}
           <motion.div
             className="absolute top-1/3 left-1/4 w-1 h-1 bg-gray-300/50 rounded-full blur-sm"
             animate={{
